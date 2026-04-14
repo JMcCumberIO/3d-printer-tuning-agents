@@ -34,7 +34,8 @@ def test_status_shows_error_when_ha_unreachable(runner):
     with patch("tune.build_ha_client", return_value=mock_client):
         result = runner.invoke(cli, ["status"])
 
-    assert result.exit_code != 0 or "error" in result.output.lower() or "could not connect" in result.output.lower()
+    assert result.exit_code == 1
+    assert "could not connect" in result.output.lower()
 
 
 def test_list_filaments_shows_db_entries(runner, tmp_path):
