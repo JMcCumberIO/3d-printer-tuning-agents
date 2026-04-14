@@ -1,0 +1,8 @@
+.env
+print_log/
+calibration_db.json
+*.bak
+__pycache__/
+*.pyc
+.venv/
+.superpowers/
