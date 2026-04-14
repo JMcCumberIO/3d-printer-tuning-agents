@@ -104,3 +104,30 @@ def test_write_process_profile_creates_backup(profile_dir):
     assert bak.exists()
     bak_data = json.loads(bak.read_text())
     assert bak_data["wall_loops"] == "5"
+
+
+def test_rollback_consumes_backup(profile_dir):
+    """Rollback removes the backup so a second rollback raises."""
+    op = OrcaProfiles(profile_dir)
+    original = op.read_filament("ELEGOO PLA+ High Speed")
+    original["nozzle_temperature"] = ["228"]
+    op.write_filament("ELEGOO PLA+ High Speed", original)
+    op.rollback_filament("ELEGOO PLA+ High Speed")
+    with pytest.raises(FileNotFoundError, match="No backup found"):
+        op.rollback_filament("ELEGOO PLA+ High Speed")
+
+
+def test_profile_diff_detects_removed_keys(profile_dir):
+    original = {"a": 1, "b": 2, "c": 3}
+    updated = {"a": 1, "c": 99}
+    op = OrcaProfiles(profile_dir)
+    diff = op.profile_diff(original, updated)
+    assert diff == {"b": (2, None), "c": (3, 99)}
+
+
+def test_profile_diff_detects_added_keys(profile_dir):
+    original = {"a": 1}
+    updated = {"a": 1, "new_key": "val"}
+    op = OrcaProfiles(profile_dir)
+    diff = op.profile_diff(original, updated)
+    assert diff == {"new_key": (None, "val")}
