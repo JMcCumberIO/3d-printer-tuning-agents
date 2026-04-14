@@ -14,7 +14,7 @@ class _OrcaEventHandler(FileSystemEventHandler):
         self,
         conf_path: Path,
         loop: asyncio.AbstractEventLoop,
-        queue: asyncio.Queue,
+        queue: asyncio.Queue[dict],
     ) -> None:
         self._conf_path = conf_path.resolve()
         self._loop = loop
@@ -25,7 +25,7 @@ class _OrcaEventHandler(FileSystemEventHandler):
         src = Path(str(event.src_path)).resolve()
         if src == self._conf_path:
             self._check_model_opened()
-        elif Path(str(event.src_path)).suffix == ".gcode" and not event.is_directory:
+        elif src.suffix == ".gcode" and not event.is_directory:
             self._emit({"type": "orca_event", "event": "slice_complete",
                         "file": str(event.src_path)})
 
@@ -58,7 +58,7 @@ class OrcaSlicerWatcher:
         conf_path: str,
         watch_dir: str,
         loop: asyncio.AbstractEventLoop,
-        queue: asyncio.Queue,
+        queue: asyncio.Queue[dict],
     ) -> None:
         self._conf_path = Path(conf_path).expanduser()
         self._watch_dir = Path(watch_dir).expanduser()
