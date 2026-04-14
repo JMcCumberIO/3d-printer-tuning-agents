@@ -1,6 +1,11 @@
 import sys
 from pathlib import Path
 import click
+import os
+import signal
+import subprocess
+
+import uvicorn
 from tools.config import get_config
 from tools.ha_client import HAClient
 from tools.calibration_db import CalibrationDB
@@ -202,6 +207,49 @@ def rollback(filament: str, nozzle: str):
     except FileNotFoundError as e:
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
+
+
+_PID_DIR = Path.home() / ".local" / "share" / "3d-tuner"
+_PID_FILE = _PID_DIR / "server.pid"
+
+
+@cli.command()
+@click.option("--port", default=8765, show_default=True, help="Port to listen on")
+@click.option("--daemon", is_flag=True, default=False, help="Run in background")
+@click.option("--stop", is_flag=True, default=False, help="Stop a running daemon")
+def serve(port: int, daemon: bool, stop: bool):
+    """Start (or stop) the dashboard server."""
+    if stop:
+        if not _PID_FILE.exists():
+            click.echo("No running server found (no PID file).", err=True)
+            sys.exit(1)
+        pid = int(_PID_FILE.read_text().strip())
+        try:
+            os.kill(pid, signal.SIGTERM)
+            _PID_FILE.unlink(missing_ok=True)
+            click.echo(f"Stopped server (PID {pid})")
+        except ProcessLookupError:
+            click.echo(f"Process {pid} not found — stale PID file removed.")
+            _PID_FILE.unlink(missing_ok=True)
+            sys.exit(1)
+        return
+
+    if daemon:
+        _PID_DIR.mkdir(parents=True, exist_ok=True)
+        proc = subprocess.Popen(
+            [sys.executable, "-m", "uvicorn", "server.app:app",
+             "--host", "0.0.0.0", "--port", str(port)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+        _PID_FILE.write_text(str(proc.pid))
+        click.echo(f"Dashboard running at http://localhost:{port}  (PID {proc.pid})")
+        click.echo("Stop with: tune serve --stop")
+        return
+
+    click.echo(f"Dashboard at http://localhost:{port}  (Ctrl+C to stop)")
+    uvicorn.run("server.app:app", host="0.0.0.0", port=port, reload=False)
 
 
 if __name__ == "__main__":

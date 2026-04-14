@@ -128,3 +128,15 @@ def test_rollback_calls_orchestrator(runner):
         result = runner.invoke(cli, ["rollback", "--filament", "Test PLA", "--nozzle", "0.4mm"])
     assert result.exit_code == 0
     mock_orch.rollback.assert_called_once_with("Test PLA", "0.4mm")
+
+
+def test_serve_foreground_starts_uvicorn(runner):
+    with patch("tune.uvicorn") as mock_uvicorn:
+        mock_uvicorn.run.return_value = None
+        result = runner.invoke(cli, ["serve", "--port", "9999"])
+    assert result.exit_code == 0
+    mock_uvicorn.run.assert_called_once()
+    kwargs = mock_uvicorn.run.call_args
+    # port may be positional arg[1] or keyword arg
+    port_used = kwargs.kwargs.get("port") or (kwargs.args[1] if len(kwargs.args) > 1 else None)
+    assert port_used == 9999
