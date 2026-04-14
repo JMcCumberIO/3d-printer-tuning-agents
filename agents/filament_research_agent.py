@@ -1,6 +1,5 @@
 # agents/filament_research_agent.py
 import json
-import re
 from datetime import datetime, timezone
 
 import anthropic
@@ -52,12 +51,15 @@ Return ONLY a JSON object with this exact structure (no other text):
 }}"""
 
     def _parse_response(self, response) -> dict:
+        decoder = json.JSONDecoder()
         for block in response.content:
             if hasattr(block, "text"):
-                match = re.search(r"\{[\s\S]+\}", block.text)
-                if match:
-                    try:
-                        return json.loads(match.group())
-                    except json.JSONDecodeError:
-                        pass
+                text = block.text
+                for i, ch in enumerate(text):
+                    if ch == '{':
+                        try:
+                            obj, _ = decoder.raw_decode(text, i)
+                            return obj
+                        except json.JSONDecodeError:
+                            continue
         raise ValueError("No valid JSON found in research response")

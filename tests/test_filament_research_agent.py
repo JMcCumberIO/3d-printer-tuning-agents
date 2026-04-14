@@ -58,3 +58,10 @@ def test_research_raises_on_unparseable_response():
     agent = FilamentResearchAgent(client)
     with pytest.raises(ValueError, match="No valid JSON"):
         agent.research("Unknown Brand Filament", "0.4mm")
+
+
+def test_research_parses_json_embedded_in_prose():
+    prose_response = "Here are the settings for your filament:\n\n" + _GOOD_RESPONSE + "\n\nLet me know if you need more details."
+    agent = FilamentResearchAgent(_mock_client(prose_response))
+    result = agent.research("ELEGOO PLA+", "0.4mm")
+    assert result["nozzle_temp"]["recommended"] == 225
