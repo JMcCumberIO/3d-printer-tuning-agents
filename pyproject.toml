@@ -29,7 +29,7 @@ dev = [
 tune = "tune:cli"
 
 [tool.setuptools.packages.find]
-include = ["tools*", "agents*", "dashboard*"]
+include = ["tools*", "agents*", "dashboard*", "server*"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
