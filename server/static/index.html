@@ -1,5 +1,60 @@
 <!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8"><title>3D Tuner</title></head>
-<body><p>Dashboard loading...</p></body>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Tuner Dashboard</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+  <div id="status-bar" class="panel">
+    <span id="print-status">&#x2014;</span>
+    <span class="sep">&middot;</span>
+    <span class="temp-label">nozzle</span>
+    <span id="nozzle-temp">&#x2014;</span>
+    <span class="sep">&middot;</span>
+    <span class="temp-label">bed</span>
+    <span id="bed-temp">&#x2014;</span>
+    <span class="sep">&middot;</span>
+    <div id="progress-bar-wrap"><div id="progress-bar"></div></div>
+    <span id="progress-pct">&#x2014;</span>
+    <span id="layer-info" style="color:var(--text2);font-size:12px"></span>
+  </div>
+
+  <div id="orca-banner" class="panel hidden">
+    <span style="font-size:10px;text-transform:uppercase;letter-spacing:0.06em">OrcaSlicer</span>
+    <span id="orca-file">&#x2014;</span>
+  </div>
+
+  <div class="main-grid">
+    <div class="left-col">
+      <div class="panel camera-panel">
+        <img id="camera-feed" src="/stream/camera" alt="Camera feed">
+        <button id="capture-btn" class="btn">Capture + Analyze</button>
+        <div id="scores" class="hidden"></div>
+      </div>
+    </div>
+    <div class="right-col">
+      <div class="panel baseline-panel">
+        <h2>Baseline &mdash; <span id="filament-name" style="text-transform:none;font-weight:400">loading&hellip;</span></h2>
+        <div id="baseline-content">&#x2014;</div>
+      </div>
+      <div class="panel pareto-panel">
+        <h2>Speed vs Quality</h2>
+        <div id="pareto-content">&#x2014;</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom-grid">
+    <div class="panel log-panel">
+      <h2>Print Log</h2>
+      <div id="log-content">&#x2014;</div>
+    </div>
+    <div class="panel future-panel">3D Viewer &mdash; Plan 3B</div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
 </html>
