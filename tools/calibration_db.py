@@ -1,3 +1,4 @@
+import copy
 import json
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -46,11 +47,11 @@ class CalibrationDB:
     def get_or_create(self, filament: str, nozzle: str) -> dict:
         key = self._key(filament, nozzle)
         if key not in self._data:
-            import copy
             self._data[key] = copy.deepcopy(_EMPTY_ENTRY)
         return self._data[key]
 
     def save(self) -> None:
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.db_path.write_text(json.dumps(self._data, indent=2))
 
     def set_baseline(self, filament: str, nozzle: str, **kwargs) -> None:
