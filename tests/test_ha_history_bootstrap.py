@@ -33,8 +33,9 @@ def mock_ha():
         ],
     ]
     client.get_print_status.return_value = "completed"
-    client.fahrenheit_to_celsius = MagicMock(side_effect=lambda f: (f - 32) * 5 / 9)
-    client.inches_per_sec_to_mms = MagicMock(side_effect=lambda v: v * 25.4)
+    # Note: production code calls HAClient.fahrenheit_to_celsius / inches_per_sec_to_mms
+    # as class-level static methods — not through the mock instance. Unit conversion
+    # is independently tested in test_ha_client.py.
     return client
 
 

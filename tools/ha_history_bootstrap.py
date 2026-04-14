@@ -1,5 +1,4 @@
 import statistics
-from typing import Optional
 from tools.ha_client import HAClient
 
 
