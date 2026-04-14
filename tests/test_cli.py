@@ -136,7 +136,4 @@ def test_serve_foreground_starts_uvicorn(runner):
         result = runner.invoke(cli, ["serve", "--port", "9999"])
     assert result.exit_code == 0
     mock_uvicorn.run.assert_called_once()
-    kwargs = mock_uvicorn.run.call_args
-    # port may be positional arg[1] or keyword arg
-    port_used = kwargs.kwargs.get("port") or (kwargs.args[1] if len(kwargs.args) > 1 else None)
-    assert port_used == 9999
+    assert mock_uvicorn.run.call_args.kwargs.get("port") == 9999

@@ -214,7 +214,7 @@ _PID_FILE = _PID_DIR / "server.pid"
 
 
 @cli.command()
-@click.option("--port", default=8765, show_default=True, help="Port to listen on")
+@click.option("--port", default=8765, type=click.IntRange(1, 65535), show_default=True, help="Port to listen on")
 @click.option("--daemon", is_flag=True, default=False, help="Run in background")
 @click.option("--stop", is_flag=True, default=False, help="Stop a running daemon")
 def serve(port: int, daemon: bool, stop: bool):
@@ -223,26 +223,33 @@ def serve(port: int, daemon: bool, stop: bool):
         if not _PID_FILE.exists():
             click.echo("No running server found (no PID file).", err=True)
             sys.exit(1)
-        pid = int(_PID_FILE.read_text().strip())
+        try:
+            pid = int(_PID_FILE.read_text().strip())
+        except ValueError:
+            click.echo("Error: PID file is corrupted. Remove ~/.local/share/3d-tuner/server.pid manually.", err=True)
+            sys.exit(1)
         try:
             os.kill(pid, signal.SIGTERM)
             _PID_FILE.unlink(missing_ok=True)
             click.echo(f"Stopped server (PID {pid})")
         except ProcessLookupError:
-            click.echo(f"Process {pid} not found — stale PID file removed.")
             _PID_FILE.unlink(missing_ok=True)
-            sys.exit(1)
+            click.echo(f"Process {pid} not found — stale PID file removed.")
         return
 
     if daemon:
         _PID_DIR.mkdir(parents=True, exist_ok=True)
-        proc = subprocess.Popen(
-            [sys.executable, "-m", "uvicorn", "server.app:app",
-             "--host", "0.0.0.0", "--port", str(port)],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            start_new_session=True,
-        )
+        try:
+            proc = subprocess.Popen(
+                [sys.executable, "-m", "uvicorn", "server.app:app",
+                 "--host", "0.0.0.0", "--port", str(port)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+        except Exception as e:
+            click.echo(f"Error: failed to start daemon: {e}", err=True)
+            sys.exit(1)
         _PID_FILE.write_text(str(proc.pid))
         click.echo(f"Dashboard running at http://localhost:{port}  (PID {proc.pid})")
         click.echo("Stop with: tune serve --stop")
