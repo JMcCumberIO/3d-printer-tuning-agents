@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 
 
 def _safe(fn):
-    """Call fn(), return None on any exception."""
+    """Call fn(), return None on any exception. fn must be synchronous (not a coroutine)."""
     try:
         return fn()
     except Exception:
