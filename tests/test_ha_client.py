@@ -110,6 +110,20 @@ def test_get_camera_snapshot_returns_bytes():
     assert data == b"FAKEJPEG"
 
 
+@respx.mock
+def test_get_history_queries_correct_url():
+    respx.get("https://primary.test:8123/api/").mock(
+        return_value=httpx.Response(200, json={"message": "API running."})
+    )
+    respx.get("https://primary.test:8123/api/history/period/2026-04-13T00:00:00Z").mock(
+        return_value=httpx.Response(200, json=[[{"state": "437.0"}], [], []])
+    )
+    client = HAClient(urls=URLS, token=TOKEN)
+    client.connect()
+    result = client.get_history(["sensor.flashforge_right_nozzle_temperature"], "2026-04-13T00:00:00")
+    assert result[0][0]["state"] == "437.0"
+
+
 def test_unit_conversion_fahrenheit_to_celsius():
     assert abs(HAClient.fahrenheit_to_celsius(212.0) - 100.0) < 0.01
     assert abs(HAClient.fahrenheit_to_celsius(32.0) - 0.0) < 0.01
