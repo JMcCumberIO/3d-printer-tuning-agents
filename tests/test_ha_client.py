@@ -187,3 +187,42 @@ async def test_get_camera_snapshot_async_returns_bytes():
     client.connect()
     data = await client.get_camera_snapshot_async()
     assert data == b"ASYNCJPEG"
+
+
+@respx.mock
+def test_get_total_layers_returns_int_when_sensor_available():
+    respx.get("https://primary.test:8123/api/").mock(
+        return_value=httpx.Response(200, json={"message": "API running."})
+    )
+    respx.get(
+        "https://primary.test:8123/api/states/sensor.flashforge_total_layers"
+    ).mock(return_value=httpx.Response(200, json={"state": "120"}))
+    client = HAClient(urls=URLS, token=TOKEN)
+    client.connect()
+    assert client.get_total_layers() == 120
+
+
+@respx.mock
+def test_get_current_file_returns_string():
+    respx.get("https://primary.test:8123/api/").mock(
+        return_value=httpx.Response(200, json={"message": "API running."})
+    )
+    respx.get(
+        "https://primary.test:8123/api/states/sensor.flashforge_current_print_file"
+    ).mock(return_value=httpx.Response(200, json={"state": "benchy.gcode"}))
+    client = HAClient(urls=URLS, token=TOKEN)
+    client.connect()
+    assert client.get_current_file() == "benchy.gcode"
+
+
+@respx.mock
+def test_get_speed_pct_returns_int():
+    respx.get("https://primary.test:8123/api/").mock(
+        return_value=httpx.Response(200, json={"message": "API running."})
+    )
+    respx.get(
+        "https://primary.test:8123/api/states/sensor.flashforge_print_speed_adjustment"
+    ).mock(return_value=httpx.Response(200, json={"state": "110"}))
+    client = HAClient(urls=URLS, token=TOKEN)
+    client.connect()
+    assert client.get_speed_pct() == 110
