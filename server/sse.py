@@ -1,15 +1,15 @@
 import asyncio
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
+from typing import AsyncGenerator
 
 
 class SSEBroker:
     def __init__(self) -> None:
-        self._queues: list[asyncio.Queue] = []
+        self._queues: list[asyncio.Queue[dict]] = []
 
     @asynccontextmanager
-    async def subscribe(self) -> AsyncIterator[asyncio.Queue]:
-        q: asyncio.Queue = asyncio.Queue(maxsize=10)
+    async def subscribe(self) -> AsyncGenerator[asyncio.Queue[dict], None]:
+        q: asyncio.Queue[dict] = asyncio.Queue(maxsize=10)
         self._queues.append(q)
         try:
             yield q
