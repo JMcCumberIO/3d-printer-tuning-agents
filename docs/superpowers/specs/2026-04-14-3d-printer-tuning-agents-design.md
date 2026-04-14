@@ -94,6 +94,16 @@ HA long-lived access token stored in `.env` (never committed). The agent tries e
 - Tracks a Pareto frontier of (print_speed → quality_score) for the active filament × nozzle
 - Stops when quality score drops below user-defined threshold (default: 0.80)
 
+#### OrcaSlicerWatcher (background service)
+- Monitors `~/.config/OrcaSlicer/OrcaSlicer.conf` via Linux `inotify` for changes
+- Detects two events:
+  - **Model opened:** `recent_projects["01"]` changes → new `.3mf` loaded in OrcaSlicer
+  - **Slice completed:** `last_backup_path` changes → fresh gcode available in OrcaSlicer's temp dir
+- On model opened: notifies dashboard with model path + "Tune this?" prompt; ProfileAdvisorAgent can be triggered with one click
+- On slice completed: reads gcode from `{last_backup_path}/Metadata/*.gcode`; dashboard 3D viewer updates live with new gcode; extracts current filament × machine × process profile from OrcaSlicer's active session
+- Checks `~/.config/OrcaSlicer/cache/*.lock` existence to gate events on OrcaSlicer actually running
+- Exposes a `/api/orca/current` endpoint on the dashboard server returning the current model path, active profiles, and slice status
+
 ---
 
 ## 3. Three-Phase Workflow
@@ -316,8 +326,15 @@ process/
 
 ### Panels
 
+#### Live OrcaSlicer Panel (when OrcaSlicer is running)
+- OrcaSlicerWatcher surfaces a persistent banner when OrcaSlicer is detected (lock file present)
+- **Model detected:** When you open a `.3mf` in OrcaSlicer, dashboard shows model name + active profile summary with a **"Tune this"** button → triggers ProfileAdvisorAgent on demand, no CLI needed
+- **Slice detected:** When you slice in OrcaSlicer, dashboard immediately loads the fresh gcode into the 3D viewer and highlights any profile settings that differ from the calibrated baseline
+- **On-the-fly advice:** Text box to ask questions ("is this speed too high for this geometry?", "should I add supports?") → Orchestrator answers in context of the current model + calibration data
+- Shows active OrcaSlicer session: current filament, machine profile, process profile, layer height
+
 #### Model Preview (dominant panel)
-- Extracts PNG thumbnail from `.3mf` file on print start (`.3mf` is a ZIP; thumbnail at `Metadata/thumbnail.png`)
+- **Two sources:** (1) Gcode from OrcaSlicerWatcher (live, updates on every slice) or (2) extracted from `.3mf` in `print_log/` (historical)
 - Full interactive 3D gcode renderer using `gcode-preview` JS library
   - Scrub any layer via slider
   - Rotate/zoom the model
@@ -399,6 +416,7 @@ The tuning agents will apply unit conversion at the boundary (°F→°C, in/s→
 | Frontend | Vanilla JS + `gcode-preview` | No build toolchain needed for dashboard |
 | HA client | `homeassistant-api` or raw `httpx` | Simple REST + WebSocket |
 | Web research | Claude API `web_search` tool | Manufacturer specs + community filament data |
+| OrcaSlicer watcher | `watchdog` Python library (inotify on Linux) | Zero-poll live detection of model open + slice events |
 | Data storage | JSON files (`calibration_db.json`, `print_log/`) | No DB dependency, human-readable, git-friendly |
 | Config | `config.yaml` + `.env` | YAML for tunable constants, `.env` for secrets |
 | CLI | `click` or `argparse` | Simple, no extra deps |
@@ -431,7 +449,8 @@ The following changes are required in `JMcCumberIO/flashforge_adventurer5m` and 
 │   ├── filament_research_agent.py  — Web research + HA history bootstrap
 │   ├── profile_advisor.py
 │   ├── vision_agent.py
-│   └── speed_optimizer.py
+│   ├── speed_optimizer.py
+│   └── orca_watcher.py             — inotify-based OrcaSlicer live monitor
 ├── tools/
 │   ├── ha_client.py             — HA REST + WebSocket wrapper
 │   ├── orca_profiles.py         — Read/write OrcaSlicer JSON profiles
