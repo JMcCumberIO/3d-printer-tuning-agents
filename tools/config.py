@@ -13,8 +13,8 @@ def get_config() -> dict:
         config = yaml.safe_load(f)
 
     urls = [
-        os.getenv("HA_URL_PRIMARY", "https://192.168.1.191:8123"),
-        os.getenv("HA_URL_FALLBACK", "https://hayjo.ddns.net:8123"),
+        os.getenv("HA_URL_PRIMARY", ""),
+        os.getenv("HA_URL_FALLBACK", ""),
         os.getenv("HA_URL_CLOUD", ""),
     ]
     config["ha"]["urls"] = [u for u in urls if u]

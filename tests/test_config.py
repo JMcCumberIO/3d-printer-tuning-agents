@@ -1,5 +1,4 @@
 import os
-import pytest
 from unittest.mock import patch
 
 def test_get_config_loads_ha_urls_from_env():
