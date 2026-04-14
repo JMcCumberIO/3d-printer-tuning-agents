@@ -133,3 +133,57 @@ def test_unit_conversion_fahrenheit_to_celsius():
 def test_unit_conversion_inches_per_sec_to_mm_per_sec():
     assert abs(HAClient.inches_per_sec_to_mms(1.0) - 25.4) < 0.01
     assert abs(HAClient.inches_per_sec_to_mms(5.905511811) - 150.0) < 0.5
+
+
+@respx.mock
+def test_get_current_layer_returns_none_when_entity_missing():
+    respx.get("https://primary.test:8123/api/").mock(
+        return_value=httpx.Response(200, json={"message": "API running."})
+    )
+    respx.get(
+        "https://primary.test:8123/api/states/sensor.flashforge_current_layer"
+    ).mock(return_value=httpx.Response(404))
+    client = HAClient(urls=URLS, token=TOKEN)
+    client.connect()
+    assert client.get_current_layer() is None
+
+
+@respx.mock
+def test_get_current_layer_returns_none_for_unavailable_state():
+    respx.get("https://primary.test:8123/api/").mock(
+        return_value=httpx.Response(200, json={"message": "API running."})
+    )
+    respx.get(
+        "https://primary.test:8123/api/states/sensor.flashforge_current_layer"
+    ).mock(return_value=httpx.Response(200, json={"state": "unavailable"}))
+    client = HAClient(urls=URLS, token=TOKEN)
+    client.connect()
+    assert client.get_current_layer() is None
+
+
+@respx.mock
+def test_get_current_layer_returns_int_when_sensor_available():
+    respx.get("https://primary.test:8123/api/").mock(
+        return_value=httpx.Response(200, json={"message": "API running."})
+    )
+    respx.get(
+        "https://primary.test:8123/api/states/sensor.flashforge_current_layer"
+    ).mock(return_value=httpx.Response(200, json={"state": "42"}))
+    client = HAClient(urls=URLS, token=TOKEN)
+    client.connect()
+    assert client.get_current_layer() == 42
+
+
+@respx.mock
+async def test_get_camera_snapshot_async_returns_bytes():
+    respx.get("https://primary.test:8123/api/").mock(
+        return_value=httpx.Response(200, json={"message": "API running."})
+    )
+    respx.get(
+        "https://primary.test:8123/api/camera_proxy/"
+        "camera.flashforge_adventurer_5m_pro_camera"
+    ).mock(return_value=httpx.Response(200, content=b"ASYNCJPEG"))
+    client = HAClient(urls=URLS, token=TOKEN)
+    client.connect()
+    data = await client.get_camera_snapshot_async()
+    assert data == b"ASYNCJPEG"

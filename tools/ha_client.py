@@ -10,6 +10,10 @@ class HAClient:
     PROGRESS_ENTITY = "sensor.flashforge_print_progress"
     SPEED_ENTITY = "sensor.flashforge_current_print_speed"
     CAMERA_ENTITY = "camera.flashforge_adventurer_5m_pro_camera"
+    LAYER_ENTITY = "sensor.flashforge_current_layer"
+    TOTAL_LAYERS_ENTITY = "sensor.flashforge_total_layers"
+    CURRENT_FILE_ENTITY = "sensor.flashforge_current_print_file"
+    SPEED_PCT_ENTITY = "sensor.flashforge_print_speed_adjustment"
 
     def __init__(self, urls: list[str], token: str, verify_ssl: bool = False):
         self.urls = [u for u in urls if u]
@@ -124,6 +128,44 @@ class HAClient:
     def get_print_speed_mms(self) -> float:
         state = self.get_state(self.SPEED_ENTITY)
         return self.inches_per_sec_to_mms(float(state["state"]))
+
+    def _get_optional_state(self, entity_id: str) -> Optional[str]:
+        """Return entity state string, or None if missing/unavailable/unknown."""
+        try:
+            state = self.get_state(entity_id)
+            if state["state"] in ("unavailable", "unknown", ""):
+                return None
+            return state["state"]
+        except Exception:
+            return None
+
+    def get_current_layer(self) -> Optional[int]:
+        val = self._get_optional_state(self.LAYER_ENTITY)
+        return int(float(val)) if val is not None else None
+
+    def get_total_layers(self) -> Optional[int]:
+        val = self._get_optional_state(self.TOTAL_LAYERS_ENTITY)
+        return int(float(val)) if val is not None else None
+
+    def get_current_file(self) -> Optional[str]:
+        return self._get_optional_state(self.CURRENT_FILE_ENTITY)
+
+    def get_speed_pct(self) -> Optional[int]:
+        val = self._get_optional_state(self.SPEED_PCT_ENTITY)
+        return int(float(val)) if val is not None else None
+
+    async def get_camera_snapshot_async(
+        self, entity_id: str = CAMERA_ENTITY
+    ) -> bytes:
+        """Async version of get_camera_snapshot() using httpx.AsyncClient."""
+        async with httpx.AsyncClient(verify=self.verify_ssl) as client:
+            r = await client.get(
+                f"{self.base_url}/api/camera_proxy/{entity_id}",
+                headers=self._headers,
+                timeout=15.0,
+            )
+            r.raise_for_status()
+            return r.content
 
     # --- Service calls ---
 
