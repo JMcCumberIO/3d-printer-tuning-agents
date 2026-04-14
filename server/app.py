@@ -144,8 +144,7 @@ async def api_filament():
     filament = config.get("active_filament", "")
     nozzle = config.get("active_nozzle", "0.4mm")
     db = CalibrationDB(DB_PATH)
-    key = CalibrationDB._key(filament, nozzle)
-    entry = db._data.get(key, {})
+    entry = db.get_entry(filament, nozzle)
     return {
         "filament": filament,
         "nozzle": nozzle,

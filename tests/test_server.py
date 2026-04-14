@@ -39,7 +39,9 @@ def _mock_ha():
 
 @pytest.fixture
 async def client():
+    import server.app as _app
     from server.app import app
+    _app._ha_client = None  # reset before test — module-level global persists between tests
     mock_ha = _mock_ha()
     with (
         patch("server.app.get_config", return_value=TEST_CONFIG),
@@ -52,6 +54,7 @@ async def client():
             transport=ASGITransport(app=app), base_url="http://test"
         ) as ac:
             yield ac
+    _app._ha_client = None  # reset after test
 
 
 async def test_index_returns_html(client):

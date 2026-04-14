@@ -50,6 +50,10 @@ class CalibrationDB:
             self._data[key] = copy.deepcopy(_EMPTY_ENTRY)
         return self._data[key]
 
+    def get_entry(self, filament: str, nozzle: str) -> dict:
+        """Return the entry for a filament/nozzle pair, or {} if not found."""
+        return self._data.get(self._key(filament, nozzle), {})
+
     def save(self) -> None:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.db_path.write_text(json.dumps(self._data, indent=2))
