@@ -57,8 +57,21 @@ HA long-lived access token stored in `.env` (never committed). The agent tries e
 - Manages all confirmation gates — nothing goes to the printer or overwrites a profile without user approval (unless in Tier 3 autonomy, see §4)
 - Writes approved changes to OrcaSlicer JSON profiles (always with `.bak` backup)
 
+#### FilamentResearchAgent
+- Triggered whenever a new filament × nozzle combination is added via `tune add-filament`
+- Searches for manufacturer spec sheets (recommended temp range, bed temp, cooling %, max speed)
+- Searches community sources for real-world tuning data specific to this filament on CoreXY/AD5M Pro printers:
+  - Reddit (r/FlashForge, r/3Dprinting, r/FixMyPrint)
+  - Printables and MakerWorld community profiles
+  - OrcaSlicer/BambuStudio filament profile repositories
+  - Filament brand forums and user reviews
+- Synthesizes findings into a `research_summary.json` entry in `calibration_db.json`
+- Sets initial parameter ranges and confidence scores based on community consensus (see §4.1)
+- Presents findings to user for review before any test prints begin
+
 #### CalibrationAgent
 - Designs and sequences calibration test prints (temperature tower → flow rate cube → pressure advance test)
+- Uses FilamentResearchAgent output as starting ranges — test prints refine within those ranges, not from scratch
 - Parses VisionAgent quality scores + user feedback to converge on baseline parameter values
 - Stores converged values in `calibration_db.json` keyed by `filament × nozzle`
 - Tracks per-parameter confidence scores (see §4)
@@ -85,6 +98,19 @@ HA long-lived access token stored in `.env` (never committed). The agent tries e
 
 ## 3. Three-Phase Workflow
 
+### Phase 0 — Add Filament (new filaments only)
+**Purpose:** Bootstrap a new filament × nozzle entry from manufacturer specs and community knowledge before any test prints.  
+**Trigger:** `tune add-filament --filament "Brand Filament Name" --nozzle 0.4`
+
+**Sequence:**
+1. FilamentResearchAgent searches manufacturer site for official temp/speed specs
+2. Agent searches Reddit, Printables, MakerWorld, and OrcaSlicer community repos for user-reported settings on CoreXY / AD5M Pro
+3. Synthesizes community consensus into initial parameter ranges + source count
+4. Presents research summary to user for review
+5. User confirms → `calibration_db.json` entry created with `research_baseline`
+6. Agent also checks HA history for any prior prints with this filament and merges confirmed values
+7. Calibration phase begins with test prints focused only on parameters not yet community-validated
+
 ### Phase 1 — Calibrate
 **Purpose:** Establish a reliable baseline for a filament × nozzle combination.  
 **Trigger:** `tune calibrate --filament "ELEGOO PLA+ High Speed" --nozzle 0.4`  
@@ -92,13 +118,15 @@ HA long-lived access token stored in `.env` (never committed). The agent tries e
 
 **Sequence:**
 1. Agent checks `calibration_db.json` for existing data and determines confidence tier (see §4)
-2. Proposes next test print in sequence (temp tower → flow cube → pressure advance)
-3. Depending on tier: confirms with user OR proceeds autonomously
-4. Sends print job to printer via HA service call (`start_print`)
-5. Monitors print via HA (`binary_sensor.flashforge_printing`, `sensor.flashforge_print_progress`)
-6. On completion: VisionAgent captures + scores; user optionally adds pass/fail note
-7. Agent updates `calibration_db.json` with new data point, recalculates confidence scores
-8. Repeats until all parameters are at Tier 2+ confidence
+2. If no entry exists, runs Phase 0 (add-filament) first
+3. Skips test prints for parameters already at Tier 2+ confidence (bootstrapped from research or HA history)
+4. Proposes next test print for unconfirmed parameters only (temp tower → flow cube → pressure advance)
+5. Depending on tier: confirms with user OR proceeds autonomously
+6. Sends print job to printer via HA service call (`start_print`)
+7. Monitors print via HA (`binary_sensor.flashforge_printing`, `sensor.flashforge_print_progress`)
+8. On completion: VisionAgent captures + scores; user optionally adds pass/fail note
+9. Agent updates `calibration_db.json` with new data point, recalculates confidence scores
+10. Repeats until all parameters are at Tier 2+ confidence
 
 ### Phase 2 — Advise
 **Purpose:** Tailor profile settings to a specific model before slicing.  
@@ -131,6 +159,57 @@ HA long-lived access token stored in `.env` (never committed). The agent tries e
 ## 4. Progressive Autonomy (Phase 1)
 
 Confirmation gates in Phase 1 shrink as calibration data accumulates. Tier is evaluated per filament × nozzle, not globally.
+
+### 4.1 Bootstrap — Before the First Test Print
+
+Every new filament × nozzle entry goes through a two-step bootstrap before any test prints run:
+
+#### Step 1 — Web Research (FilamentResearchAgent)
+Triggered by `tune add-filament --filament "Brand Name Filament" --nozzle 0.4`:
+
+1. Agent searches manufacturer site for official spec sheet (temp range, bed temp, cooling, speed limits)
+2. Agent searches community sources for AD5M Pro / CoreXY tuning data for this exact filament:
+   - Reddit threads with user-reported settings
+   - Printables / MakerWorld filament profiles and comments
+   - OrcaSlicer community profile repositories
+   - User reviews mentioning specific temp/speed/flow settings
+3. Agent synthesizes a `research_baseline` — the community-consensus starting point with ranges
+4. Presents a summary to the user for review and confirmation before proceeding
+
+The research baseline populates `calibration_db.json` with initial ranges and sets per-parameter confidence to `community` tier (higher than zero, lower than test-validated):
+
+```json
+"research_baseline": {
+  "source": "manufacturer + community",
+  "retrieved": "2026-04-14",
+  "nozzle_temp": { "recommended": 225, "range": [215, 235], "source_count": 12 },
+  "bed_temp":    { "recommended": 60,  "range": [55, 65],   "source_count": 12 },
+  "flow_rate":   { "recommended": 1.0, "range": [0.95, 1.05], "source_count": 6 },
+  "max_speed":   { "recommended": 200, "range": [150, 300], "source_count": 8 },
+  "cooling_fan": { "recommended": 100, "range": [80, 100],  "source_count": 9 }
+}
+```
+
+#### Step 2 — HA History Bootstrap (existing filaments only)
+For filaments that have already been printed (printer has run them before HA integration existed):
+
+1. Query HA history for completed print sessions
+2. Extract stable mid-print temperatures, speed distributions, fan states
+3. Cross-reference with OrcaSlicer user profile files in `~/.config/OrcaSlicer/user/default/`
+4. Pre-populate baseline with statistically confirmed values, skipping those parameters to Tier 2
+
+**Bootstrap result for ELEGOO PLA+ High Speed (existing filament, confirmed from HA Apr 13 session):**
+
+| Parameter | Bootstrapped Value | Source | Starting Tier |
+|---|---|---|---|
+| nozzle_temp | 225°C (median of 6,499 readings) | HA history | Tier 2 |
+| bed_temp | 60°C (median of 6,744 readings) | HA history | Tier 2 |
+| cooling_fan | 100% | HA history | Tier 2 |
+| flow_rate | 0.98 (from OrcaSlicer profile) | Profile file | Tier 1 |
+| pressure_advance | 0.042 (from OrcaSlicer profile) | Profile file | Tier 1 |
+| max_speed | 225mm/s median observed | HA history | Tier 1 (needs validation) |
+
+This means calibration for ELEGOO PLA+ can skip temperature and bed tests entirely and go straight to flow rate and pressure advance refinement.
 
 ### Tier 1 — Cold Start (0–3 print runs)
 - No history. Full confirmation required for every action.
@@ -319,6 +398,7 @@ The tuning agents will apply unit conversion at the boundary (°F→°C, in/s→
 | Web server | FastAPI | Async, simple, good for streaming HA polls |
 | Frontend | Vanilla JS + `gcode-preview` | No build toolchain needed for dashboard |
 | HA client | `homeassistant-api` or raw `httpx` | Simple REST + WebSocket |
+| Web research | Claude API `web_search` tool | Manufacturer specs + community filament data |
 | Data storage | JSON files (`calibration_db.json`, `print_log/`) | No DB dependency, human-readable, git-friendly |
 | Config | `config.yaml` + `.env` | YAML for tunable constants, `.env` for secrets |
 | CLI | `click` or `argparse` | Simple, no extra deps |
@@ -348,6 +428,7 @@ The following changes are required in `JMcCumberIO/flashforge_adventurer5m` and 
 ├── agents/
 │   ├── orchestrator.py
 │   ├── calibration_agent.py
+│   ├── filament_research_agent.py  — Web research + HA history bootstrap
 │   ├── profile_advisor.py
 │   ├── vision_agent.py
 │   └── speed_optimizer.py
@@ -355,7 +436,9 @@ The following changes are required in `JMcCumberIO/flashforge_adventurer5m` and 
 │   ├── ha_client.py             — HA REST + WebSocket wrapper
 │   ├── orca_profiles.py         — Read/write OrcaSlicer JSON profiles
 │   ├── gcode_extractor.py       — Extract gcode + thumbnail from .3mf
-│   └── calibration_db.py        — calibration_db.json read/write
+│   ├── calibration_db.py        — calibration_db.json read/write
+│   ├── web_research.py          — Web search wrapper for filament data
+│   └── ha_history_bootstrap.py  — Mine HA history to seed calibration_db
 ├── dashboard/
 │   ├── server.py                — FastAPI web server
 │   ├── static/
