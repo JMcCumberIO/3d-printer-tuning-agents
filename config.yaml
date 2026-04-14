@@ -1,0 +1,32 @@
+calibration:
+  tier2_min_runs: 4
+  tier3_min_runs: 11
+  tier2_auto_proceed_variance: 0.05   # 5% from last known-good
+  speed_step_percent: 10
+  speed_quality_threshold: 0.80
+
+vision:
+  quality_dimensions:
+    - stringing
+    - layer_adhesion
+    - warping
+    - surface_finish
+    - overall
+
+dashboard:
+  port: 8000
+  ha_poll_interval_seconds: 5
+
+ha:
+  snapshot_entity: "camera.flashforge_adventurer_5m_pro_camera"
+  status_entity: "sensor.flashforge_status"
+  printing_entity: "binary_sensor.flashforge_printing"
+  progress_entity: "sensor.flashforge_print_progress"
+  eta_entity: "sensor.flashforge_estimated_time_remaining"
+  nozzle_temp_entity: "sensor.flashforge_right_nozzle_temperature"
+  bed_temp_entity: "sensor.flashforge_platform_temperature"
+  print_speed_entity: "sensor.flashforge_current_print_speed"
+
+orca:
+  conf_path: "~/.config/OrcaSlicer/OrcaSlicer.conf"
+  cache_dir: "~/.config/OrcaSlicer/cache"

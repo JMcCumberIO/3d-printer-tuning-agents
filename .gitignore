@@ -6,3 +6,4 @@ __pycache__/
 *.pyc
 .venv/
 .superpowers/
+tune3d.egg-info/
