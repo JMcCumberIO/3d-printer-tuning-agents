@@ -123,3 +123,22 @@ async def test_conf_without_recent_projects_does_not_emit(tmp_path):
 
     handler._check_model_opened()
     assert queue.empty()
+
+
+async def test_always_emit_fires_on_startup_even_if_unchanged(tmp_path):
+    conf = tmp_path / "OrcaSlicer.conf"
+    _orca_conf(conf, "/startup/model.3mf")
+    loop = asyncio.get_running_loop()
+    queue = asyncio.Queue()
+    handler = _OrcaEventHandler(conf, loop, queue)
+
+    handler._check_model_opened(always_emit=True)  # first read, always_emit
+    await asyncio.sleep(0)
+    event = queue.get_nowait()
+    assert event["event"] == "model_opened"
+    assert event["file"] == "/startup/model.3mf"
+
+    # calling again without always_emit should NOT re-emit (same value)
+    handler._check_model_opened()
+    await asyncio.sleep(0)
+    assert queue.empty()

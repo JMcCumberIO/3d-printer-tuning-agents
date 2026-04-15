@@ -34,14 +34,14 @@ class _OrcaEventHandler(FileSystemEventHandler):
             self._emit({"type": "orca_event", "event": "slice_complete",
                         "file": str(event.src_path)})
 
-    def _check_model_opened(self) -> None:
+    def _check_model_opened(self, always_emit: bool = False) -> None:
         # OrcaSlicer.conf is JSON. The most recently opened project is at
         # recent_projects["01"]; it updates every time a project is opened.
         try:
             import json
             data = json.loads(self._conf_path.read_text(errors="replace"))
             value = data.get("recent_projects", {}).get("01")
-            if value and value != self._last_opened:
+            if value and (always_emit or value != self._last_opened):
                 self._last_opened = value
                 self._emit({"type": "orca_event", "event": "model_opened",
                             "file": value})
@@ -70,6 +70,8 @@ class OrcaSlicerWatcher:
 
     def start(self) -> None:
         handler = _OrcaEventHandler(self._conf_path, self._loop, self._queue)
+        # Emit whatever model is currently open so the dashboard shows it immediately.
+        handler._check_model_opened(always_emit=True)
         self._observer = Observer()
         # Watch OrcaSlicer config dir for conf changes (model_opened)
         self._observer.schedule(handler, str(self._watch_dir), recursive=False)
