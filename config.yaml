@@ -30,3 +30,5 @@ ha:
 orca:
   conf_path: "~/.config/OrcaSlicer/OrcaSlicer.conf"
   cache_dir: "~/.config/OrcaSlicer/cache"
+  # Directory where OrcaSlicer exports gcode — check OrcaSlicer > File > Export > last used path
+  gcode_output_dir: "~/projects/3D Printing"

@@ -35,17 +35,17 @@ class _OrcaEventHandler(FileSystemEventHandler):
                         "file": str(event.src_path)})
 
     def _check_model_opened(self) -> None:
+        # OrcaSlicer.conf is JSON. The most recently opened project is at
+        # recent_projects["01"]; it updates every time a project is opened.
         try:
-            text = self._conf_path.read_text(errors="replace")
-            for line in text.splitlines():
-                if line.strip().startswith("last_opened"):
-                    value = line.split("=", 1)[-1].strip()
-                    if value != self._last_opened:
-                        self._last_opened = value
-                        self._emit({"type": "orca_event", "event": "model_opened",
-                                    "file": value})
-                    break
-        except OSError:
+            import json
+            data = json.loads(self._conf_path.read_text(errors="replace"))
+            value = data.get("recent_projects", {}).get("01")
+            if value and value != self._last_opened:
+                self._last_opened = value
+                self._emit({"type": "orca_event", "event": "model_opened",
+                            "file": value})
+        except (OSError, json.JSONDecodeError):
             pass
 
     def _emit(self, payload: dict) -> None:
@@ -59,9 +59,11 @@ class OrcaSlicerWatcher:
         watch_dir: str,
         loop: asyncio.AbstractEventLoop,
         queue: asyncio.Queue[dict],
+        gcode_output_dir: Optional[str] = None,
     ) -> None:
         self._conf_path = Path(conf_path).expanduser()
         self._watch_dir = Path(watch_dir).expanduser()
+        self._gcode_output_dir = Path(gcode_output_dir).expanduser() if gcode_output_dir else None
         self._loop = loop
         self._queue = queue
         self._observer: Optional[Observer] = None
@@ -69,7 +71,15 @@ class OrcaSlicerWatcher:
     def start(self) -> None:
         handler = _OrcaEventHandler(self._conf_path, self._loop, self._queue)
         self._observer = Observer()
-        self._observer.schedule(handler, str(self._watch_dir), recursive=True)
+        # Watch OrcaSlicer config dir for conf changes (model_opened)
+        self._observer.schedule(handler, str(self._watch_dir), recursive=False)
+        # Watch gcode output dir if configured and different from conf dir
+        if self._gcode_output_dir and self._gcode_output_dir != self._watch_dir:
+            if self._gcode_output_dir.exists():
+                self._observer.schedule(handler, str(self._gcode_output_dir), recursive=True)
+                logger.info("OrcaSlicerWatcher watching gcode output: %s", self._gcode_output_dir)
+            else:
+                logger.warning("gcode_output_dir does not exist, skipping: %s", self._gcode_output_dir)
         self._observer.start()
         logger.info("OrcaSlicerWatcher started on %s", self._watch_dir)
 
