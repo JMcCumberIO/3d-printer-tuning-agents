@@ -84,10 +84,12 @@ async def lifespan(app: FastAPI):
         orca_conf = orca_cfg.get("conf_path", "~/.config/OrcaSlicer/OrcaSlicer.conf")
         orca_dir = str(Path(orca_conf).expanduser().parent)
         gcode_output_dir = orca_cfg.get("gcode_output_dir")
+        tmp_dir = orca_cfg.get("tmp_dir")
         loop = asyncio.get_running_loop()
         _orca_watcher = OrcaSlicerWatcher(
             orca_conf, orca_dir, loop, _orca_queue,
             gcode_output_dir=gcode_output_dir,
+            tmp_dir=tmp_dir,
         )
         try:
             _orca_watcher.start()

@@ -28,7 +28,11 @@ ha:
   print_speed_entity: "sensor.flashforge_current_print_speed"
 
 orca:
+  # Pacman install (active): ~/.config/OrcaSlicer/OrcaSlicer.conf
+  # Flatpak remnant (stale, last used 2025-07): ~/.var/app/io.github.softfever.OrcaSlicer/config/OrcaSlicer/OrcaSlicer.conf
   conf_path: "~/.config/OrcaSlicer/OrcaSlicer.conf"
   cache_dir: "~/.config/OrcaSlicer/cache"
   # Directory where OrcaSlicer exports gcode — check OrcaSlicer > File > Export > last used path
   gcode_output_dir: "~/projects/3D Printing"
+  # Live session temp dir — OrcaSlicer writes here for ALL loaded models, even unsaved ones
+  tmp_dir: "/tmp/orcaslicer_model"
