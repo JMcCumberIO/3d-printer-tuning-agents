@@ -1,6 +1,7 @@
 # agents/calibration_agent.py
 import json
 import time
+from pathlib import Path
 from typing import Callable, Optional
 
 import anthropic
@@ -9,6 +10,7 @@ from agents.vision_agent import VisionAgent
 from tools.calibration_db import CalibrationDB
 from tools.ha_client import HAClient
 from tools.orca_profiles import OrcaProfiles
+from tools.orca_reader import read_current_settings, read_gcode_setting, wait_for_new_gcode
 from tools.print_logger import PrintLogger
 
 
@@ -38,6 +40,7 @@ class CalibrationAgent:
         ask_fn: Callable[[str], str] = input,
         poll_interval_seconds: int = 15,
         profiles: Optional[OrcaProfiles] = None,
+        gcode_export_dir: Optional[str] = None,
     ):
         self.client = client
         self.db = db
@@ -48,6 +51,7 @@ class CalibrationAgent:
         self.ask_fn = ask_fn
         self.poll_interval = poll_interval_seconds
         self.profiles = profiles  # optional, used for profile writes
+        self.gcode_export_dir = Path(gcode_export_dir).expanduser() if gcode_export_dir else None
 
     def run(self, filament: str, nozzle: str) -> dict:
         """
@@ -68,18 +72,44 @@ class CalibrationAgent:
             value = suggestion["value"]
             rationale = suggestion.get("rationale", "")
 
+            # Show current OrcaSlicer setting vs target so the user knows what to change.
+            current = read_current_settings().get(param)
+            if current is not None and current != value:
+                change_hint = f"  OrcaSlicer currently has {param}={current} → change to {value}"
+            elif current == value:
+                change_hint = f"  OrcaSlicer already has {param}={value} ✓"
+            else:
+                change_hint = f"  Set {param}={value} in OrcaSlicer"
+
             msg = (
                 f"[Tier {tier}] Test {param} = {value}  ({rationale})\n"
-                f"Please slice a test print with {param}={value} in OrcaSlicer."
+                f"{change_hint}\n"
+                f"Slice in OrcaSlicer then export gcode to {self.gcode_export_dir or '~/projects/3D Printing'}."
             )
 
             if not self.confirm_fn(msg):
                 declined.append(param)
                 continue
 
-            gcode_path = self.ask_fn(
-                f"Enter the gcode file path on the printer for {param}={value} test: "
-            )
+            # Auto-detect gcode export instead of asking the user for a path.
+            gcode_path: Optional[str] = None
+            if self.gcode_export_dir and self.gcode_export_dir.exists():
+                print(f"Waiting for gcode export to {self.gcode_export_dir} …")
+                detected = wait_for_new_gcode(self.gcode_export_dir, timeout_seconds=600)
+                if detected:
+                    # Verify the setting is actually in the file.
+                    actual = read_gcode_setting(detected, param)
+                    if actual is not None and actual != value:
+                        print(f"  Warning: gcode has {param}={actual}, expected {value}. Proceeding anyway.")
+                    gcode_path = str(detected)
+                    print(f"  Detected: {detected.name}")
+                else:
+                    print("  Timed out waiting for gcode. Falling back to manual entry.")
+
+            if not gcode_path:
+                gcode_path = self.ask_fn(
+                    f"Enter the gcode file path on the printer for {param}={value} test: "
+                )
             if not gcode_path:
                 declined.append(param)
                 continue

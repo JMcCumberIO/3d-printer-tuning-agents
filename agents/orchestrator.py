@@ -75,10 +75,12 @@ class Orchestrator:
 
         vision = VisionAgent(client, ha)
         research = FilamentResearchAgent(client)
+        gcode_export_dir = config.get("orca", {}).get("gcode_output_dir", "~/projects/3D Printing")
         calibration = CalibrationAgent(
             client=client, db=db, ha=ha, vision=vision, logger=logger,
             confirm_fn=confirm_fn, ask_fn=ask_fn,
             poll_interval_seconds=15,
+            gcode_export_dir=gcode_export_dir,
         )
         advisor = ProfileAdvisorAgent(client, db)
         optimizer = SpeedOptimizerAgent(
