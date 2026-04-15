@@ -5,7 +5,14 @@ function escHtml(s) {
   ));
 }
 
-// SSE connection
+// Populate OrcaSlicer banner from last known state so it shows on first load
+// even if the model was opened before the browser connected.
+fetch("/api/orca")
+  .then((r) => r.json())
+  .then((d) => { if (d.event) handleOrcaEvent(d); })
+  .catch(() => {});
+
+// SSE connection — keeps the banner live for new events after page load
 const es = new EventSource("/stream/events");
 es.onmessage = (e) => {
   const data = JSON.parse(e.data);

@@ -30,6 +30,7 @@ _poller_task: asyncio.Task | None = None
 _orca_task: asyncio.Task | None = None
 _orca_watcher: OrcaSlicerWatcher | None = None
 _orca_queue: asyncio.Queue = asyncio.Queue()
+_orca_state: dict = {}  # last known orca event — served to browsers on connect
 
 
 def _safe(fn):
@@ -99,8 +100,11 @@ async def lifespan(app: FastAPI):
         logger.warning("Could not set up OrcaSlicerWatcher: %s", e)
 
     async def _forward_orca():
+        global _orca_state
         while True:
             evt = await _orca_queue.get()
+            if evt.get("event") in ("model_opened", "slice_complete"):
+                _orca_state = evt
             await broker.publish(evt)
 
     _orca_task = asyncio.create_task(_forward_orca())
@@ -161,6 +165,11 @@ async def api_filament():
         "speed_pareto": entry.get("speed_pareto", []),
         "recent_runs": entry.get("run_history", [])[-5:],
     }
+
+
+@app.get("/api/orca")
+async def api_orca():
+    return _orca_state
 
 
 @app.get("/stream/events")
