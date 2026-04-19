@@ -62,6 +62,7 @@ class CalibrationAgent:
         tier = self.db.get_confidence_tier(filament, nozzle)
 
         tested, skipped, declined, results = [], [], [], []
+        _last_gcode: Optional[str] = None  # reuse across params that don't need re-slice
 
         for param in self.CALIBRATION_SEQUENCE:
             if entry["baseline"].get(param) is not None:
@@ -74,42 +75,59 @@ class CalibrationAgent:
 
             # Show current OrcaSlicer setting vs target so the user knows what to change.
             current = read_current_settings().get(param)
-            if current is not None and current != value:
+            setting_already_correct = (current is not None and current == value)
+            if current is not None and not setting_already_correct:
                 change_hint = f"  OrcaSlicer currently has {param}={current} → change to {value}"
-            elif current == value:
+            elif setting_already_correct:
                 change_hint = f"  OrcaSlicer already has {param}={value} ✓"
             else:
                 change_hint = f"  Set {param}={value} in OrcaSlicer"
 
+            # If the setting is already correct and we have a gcode from the previous
+            # iteration, we can reuse it — no need to re-slice.
+            needs_new_slice = not setting_already_correct or _last_gcode is None
+            if needs_new_slice:
+                slice_hint = (
+                    f"Slice in OrcaSlicer, then click Send to Printer (or export to "
+                    f"{self.gcode_export_dir or '~/projects/3D Printing'} and click Print)."
+                )
+            else:
+                slice_hint = f"Settings unchanged — will reuse last gcode. Click Print in OrcaSlicer when ready."
+
             msg = (
                 f"[Tier {tier}] Test {param} = {value}  ({rationale})\n"
                 f"{change_hint}\n"
-                f"Slice in OrcaSlicer then export gcode to {self.gcode_export_dir or '~/projects/3D Printing'}."
+                f"{slice_hint}"
             )
 
             if not self.confirm_fn(msg):
                 declined.append(param)
                 continue
 
-            # Auto-detect gcode export instead of asking the user for a path.
+            # Determine the gcode to use.
             gcode_path: Optional[str] = None
-            if self.gcode_export_dir and self.gcode_export_dir.exists():
+            if needs_new_slice and self.gcode_export_dir and self.gcode_export_dir.exists():
                 print(f"Waiting for gcode export to {self.gcode_export_dir} …")
                 detected = wait_for_new_gcode(self.gcode_export_dir, timeout_seconds=600)
                 if detected:
-                    # Verify the setting is actually in the file.
                     actual = read_gcode_setting(detected, param)
                     if actual is not None and actual != value:
                         print(f"  Warning: gcode has {param}={actual}, expected {value}. Proceeding anyway.")
                     gcode_path = str(detected)
+                    _last_gcode = gcode_path
                     print(f"  Detected: {detected.name}")
                 else:
                     print("  Timed out waiting for gcode. Falling back to manual entry.")
+            elif not needs_new_slice and _last_gcode:
+                gcode_path = _last_gcode
+                print(f"  Reusing: {Path(gcode_path).name}")
 
             if not gcode_path:
                 gcode_path = self.ask_fn(
                     f"Enter the gcode file path on the printer for {param}={value} test: "
                 )
+                if gcode_path:
+                    _last_gcode = gcode_path
             if not gcode_path:
                 declined.append(param)
                 continue
@@ -127,16 +145,20 @@ class CalibrationAgent:
             except Exception:
                 pass
 
-            # Upload local gcode to printer, then start by printer path.
-            printer_path = gcode_path
+            # Upload gcode to printer (HA integration holds the binary control session,
+            # so upload may fail if it can't get M601 control — in that case ask user
+            # to print directly from OrcaSlicer and we wait for HA to detect printing).
+            printer_path: Optional[str] = None
             try:
                 print(f"  Uploading {Path(gcode_path).name} to printer…")
                 printer_path = self.ha.upload_gcode(gcode_path)
-                print(f"  Uploaded → {printer_path}")
+                print(f"  Uploaded → {printer_path}. Starting print…")
+                self.ha.start_print(printer_path)
             except Exception as e:
-                print(f"  Upload failed ({e}), attempting start with local path")
+                print(f"  Auto-upload unavailable ({e}).")
+                print(f"  → In OrcaSlicer, click Send to Printer / Print now.")
+                print(f"  Waiting for printer to start…")
 
-            self.ha.start_print(printer_path)
             final_status = self._wait_for_print()
 
             # Capture + score
@@ -210,11 +232,25 @@ Return ONLY JSON: {{"value": <number>, "rationale": "<one sentence>"}}"""
                             continue
         return {"value": 225, "rationale": "default fallback"}
 
-    def _wait_for_print(self, timeout_min: int = 120) -> str:
-        """Poll HA every poll_interval seconds until printing stops. Returns final status."""
-        deadline = time.monotonic() + timeout_min * 60
+    def _wait_for_print(self, start_timeout_min: int = 5, print_timeout_min: int = 120) -> str:
+        """
+        Wait up to start_timeout_min for printing to begin, then up to print_timeout_min
+        for it to finish. Returns final HA status string.
+        """
+        # Phase 1: wait for print to start (covers the case where the user
+        # clicks Print in OrcaSlicer after upload fails).
+        start_deadline = time.monotonic() + start_timeout_min * 60
+        while time.monotonic() < start_deadline:
+            if self.ha.is_printing():
+                break
+            time.sleep(self.poll_interval or 2)
+        else:
+            raise TimeoutError(f"Print did not start within {start_timeout_min} minutes")
+
+        # Phase 2: wait for print to finish.
+        deadline = time.monotonic() + print_timeout_min * 60
         while time.monotonic() < deadline:
             if not self.ha.is_printing():
                 return self.ha.get_print_status()
             time.sleep(self.poll_interval)
-        raise TimeoutError(f"Print did not complete within {timeout_min} minutes")
+        raise TimeoutError(f"Print did not complete within {print_timeout_min} minutes")

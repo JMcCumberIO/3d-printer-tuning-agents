@@ -124,6 +124,6 @@ def test_wait_for_print_polls_until_not_printing(db, mock_ha, mock_vision, tmp_p
         confirm_fn=lambda msg: True, ask_fn=lambda p: "/tmp/x.gcode",
         poll_interval_seconds=0,
     )
-    status = agent._wait_for_print(timeout_min=1)
+    status = agent._wait_for_print(start_timeout_min=1, print_timeout_min=1)
     assert status == "completed"
     assert mock_ha.is_printing.call_count == 3
