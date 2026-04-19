@@ -61,6 +61,7 @@ class Orchestrator:
             urls=config["ha"]["urls"],
             token=config["ha"]["token"],
             verify_ssl=config["ha"]["verify_ssl"],
+            printer_ip=config["ha"].get("printer_ip"),
         )
         ha.connect()
 

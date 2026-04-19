@@ -74,7 +74,9 @@ def test_run_proposes_and_starts_print_for_untested_param(db, mock_ha, mock_visi
         poll_interval_seconds=0,
     )
     result = agent.run("Test PLA", "0.4mm")
-    mock_ha.start_print.assert_called_once_with("/user/models/test.gcode")
+    # start_print is called with the printer path returned by upload_gcode
+    mock_ha.upload_gcode.assert_called_once_with("/user/models/test.gcode")
+    mock_ha.start_print.assert_called_once_with(mock_ha.upload_gcode.return_value)
 
 
 def test_run_updates_db_after_print(db, mock_ha, mock_vision, tmp_path):

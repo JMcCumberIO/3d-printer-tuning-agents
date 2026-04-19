@@ -1,3 +1,6 @@
+active_filament: "ELEGOO PLA+"
+active_nozzle: "0.4mm"
+
 calibration:
   tier2_min_runs: 4
   tier3_min_runs: 11
@@ -18,6 +21,7 @@ dashboard:
   ha_poll_interval_seconds: 5
 
 ha:
+  printer_ip: "192.168.1.137"   # direct FlashForge binary protocol (port 8899)
   snapshot_entity: "camera.flashforge_adventurer_5m_pro_camera"
   status_entity: "sensor.flashforge_status"
   printing_entity: "binary_sensor.flashforge_printing"

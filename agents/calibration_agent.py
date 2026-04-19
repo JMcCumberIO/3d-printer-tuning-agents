@@ -127,7 +127,16 @@ class CalibrationAgent:
             except Exception:
                 pass
 
-            self.ha.start_print(gcode_path)
+            # Upload local gcode to printer, then start by printer path.
+            printer_path = gcode_path
+            try:
+                print(f"  Uploading {Path(gcode_path).name} to printer…")
+                printer_path = self.ha.upload_gcode(gcode_path)
+                print(f"  Uploaded → {printer_path}")
+            except Exception as e:
+                print(f"  Upload failed ({e}), attempting start with local path")
+
+            self.ha.start_print(printer_path)
             final_status = self._wait_for_print()
 
             # Capture + score

@@ -1,5 +1,9 @@
-import httpx
+import socket
+import os
+from pathlib import Path
 from typing import Optional
+
+import httpx
 
 
 class HAClient:
@@ -15,10 +19,16 @@ class HAClient:
     CURRENT_FILE_ENTITY = "sensor.flashforge_current_print_file"
     SPEED_PCT_ENTITY = "sensor.flashforge_print_speed_adjustment"
 
-    def __init__(self, urls: list[str], token: str, verify_ssl: bool = False):
+    # FlashForge binary protocol constants
+    _FF_PORT = 8899
+    _FF_HA_DOMAIN = "flashforge_adventurer5m"
+
+    def __init__(self, urls: list[str], token: str, verify_ssl: bool = False,
+                 printer_ip: Optional[str] = None):
         self.urls = [u for u in urls if u]
         self.token = token
         self.verify_ssl = verify_ssl
+        self.printer_ip = printer_ip
         self.base_url: Optional[str] = None
         self._headers = {
             "Authorization": f"Bearer {token}",
@@ -170,13 +180,77 @@ class HAClient:
     # --- Service calls ---
 
     def start_print(self, file_path: str) -> list:
-        return self.call_service("flashforge", "start_print", {"file_path": file_path})
+        return self.call_service(self._FF_HA_DOMAIN, "start_print", {"file_path": file_path})
 
     def pause_print(self) -> list:
-        return self.call_service("flashforge", "pause_print", {})
+        return self.call_service(self._FF_HA_DOMAIN, "pause_print", {})
 
     def cancel_print(self) -> list:
-        return self.call_service("flashforge", "cancel_print", {})
+        return self.call_service(self._FF_HA_DOMAIN, "cancel_print", {})
+
+    # --- Direct printer file upload (FlashForge binary protocol) ---
+
+    def upload_gcode(self, local_path: str, chunk_size: int = 4096,
+                     timeout: float = 60.0) -> str:
+        """
+        Upload a local gcode file to the printer via the FlashForge binary protocol.
+
+        Returns the path on the printer (e.g. '/data/model.gcode') which can be
+        passed directly to start_print().
+
+        Raises ConnectionError if printer_ip is not configured.
+        Raises RuntimeError if the printer rejects the upload.
+        """
+        if not self.printer_ip:
+            raise ConnectionError(
+                "printer_ip is required for direct upload. "
+                "Add 'printer_ip' to the [ha] section of config.yaml."
+            )
+
+        path = Path(local_path)
+        size = path.stat().st_size
+        filename = path.name
+
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(timeout)
+        try:
+            sock.connect((self.printer_ip, self._FF_PORT))
+
+            # Handshake
+            sock.sendall(b"~M601 S1\r\n")
+            resp = sock.recv(256)
+            if b"Control Success" not in resp:
+                raise RuntimeError(f"FlashForge handshake failed: {resp!r}")
+
+            # Start upload: printer responds with the path it will write to
+            cmd = f"~M28 {size} 0:/user/{filename}\r\n".encode()
+            sock.sendall(cmd)
+            resp = sock.recv(256)
+            if b"Writing to file:" not in resp:
+                raise RuntimeError(f"FlashForge M28 rejected: {resp!r}")
+
+            # Parse printer path from response: "Writing to file: /data/foo.gcode"
+            printer_path = "/data/" + filename
+            for part in resp.decode(errors="replace").split("\n"):
+                if "Writing to file:" in part:
+                    printer_path = part.split("Writing to file:")[-1].strip()
+                    break
+
+            # Stream file data
+            with open(local_path, "rb") as f:
+                while True:
+                    chunk = f.read(chunk_size)
+                    if not chunk:
+                        break
+                    sock.sendall(chunk)
+
+            # Finalise upload
+            sock.sendall(b"~M29\r\n")
+            sock.recv(256)  # consume ack
+
+            return printer_path
+        finally:
+            sock.close()
 
     def ha_snapshot(self) -> dict[str, str]:
         """Return all HA entity states as a flat dict for logging."""

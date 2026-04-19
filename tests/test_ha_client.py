@@ -87,7 +87,7 @@ def test_call_service_posts_to_correct_endpoint():
     respx.get("https://primary.test:8123/api/").mock(
         return_value=httpx.Response(200, json={"message": "API running."})
     )
-    respx.post("https://primary.test:8123/api/services/flashforge/start_print").mock(
+    respx.post("https://primary.test:8123/api/services/flashforge_adventurer5m/start_print").mock(
         return_value=httpx.Response(200, json=[])
     )
     client = HAClient(urls=URLS, token=TOKEN)
