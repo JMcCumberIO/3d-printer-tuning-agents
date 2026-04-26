@@ -23,13 +23,13 @@ dashboard:
 ha:
   printer_ip: "192.168.1.137"   # direct FlashForge binary protocol (port 8899)
   snapshot_entity: "camera.flashforge_adventurer_5m_pro_camera"
-  status_entity: "sensor.flashforge_status"
+  status_entity: "sensor.flashforge_adventurer_5m_pro_flashforge_status"
   printing_entity: "binary_sensor.flashforge_printing"
-  progress_entity: "sensor.flashforge_print_progress"
-  eta_entity: "sensor.flashforge_estimated_time_remaining"
-  nozzle_temp_entity: "sensor.flashforge_right_nozzle_temperature"
-  bed_temp_entity: "sensor.flashforge_platform_temperature"
-  print_speed_entity: "sensor.flashforge_current_print_speed"
+  progress_entity: "sensor.flashforge_adventurer_5m_pro_flashforge_print_progress"
+  eta_entity: "sensor.flashforge_adventurer_5m_pro_flashforge_estimated_time_remaining"
+  nozzle_temp_entity: "sensor.flashforge_adventurer_5m_pro_flashforge_right_nozzle_temperature"
+  bed_temp_entity: "sensor.flashforge_adventurer_5m_pro_flashforge_platform_temperature"
+  print_speed_entity: "sensor.flashforge_adventurer_5m_pro_flashforge_current_print_speed"
 
 orca:
   # Pacman install (active): ~/.config/OrcaSlicer/OrcaSlicer.conf

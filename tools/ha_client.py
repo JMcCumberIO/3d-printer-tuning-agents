@@ -7,17 +7,18 @@ import httpx
 
 
 class HAClient:
-    NOZZLE_TEMP_ENTITY = "sensor.flashforge_right_nozzle_temperature"
-    BED_TEMP_ENTITY = "sensor.flashforge_platform_temperature"
-    STATUS_ENTITY = "sensor.flashforge_status"
+    _PREFIX = "sensor.flashforge_adventurer_5m_pro_flashforge_"
+    NOZZLE_TEMP_ENTITY = _PREFIX + "right_nozzle_temperature"
+    BED_TEMP_ENTITY = _PREFIX + "platform_temperature"
+    STATUS_ENTITY = _PREFIX + "status"
     PRINTING_ENTITY = "binary_sensor.flashforge_printing"
-    PROGRESS_ENTITY = "sensor.flashforge_print_progress"
-    SPEED_ENTITY = "sensor.flashforge_current_print_speed"
+    PROGRESS_ENTITY = _PREFIX + "print_progress"
+    SPEED_ENTITY = _PREFIX + "current_print_speed"
     CAMERA_ENTITY = "camera.flashforge_adventurer_5m_pro_camera"
-    LAYER_ENTITY = "sensor.flashforge_current_layer"
-    TOTAL_LAYERS_ENTITY = "sensor.flashforge_total_layers"
-    CURRENT_FILE_ENTITY = "sensor.flashforge_current_print_file"
-    SPEED_PCT_ENTITY = "sensor.flashforge_print_speed_adjustment"
+    LAYER_ENTITY = _PREFIX + "current_layer"
+    TOTAL_LAYERS_ENTITY = _PREFIX + "total_layers"
+    CURRENT_FILE_ENTITY = _PREFIX + "current_print_file"
+    SPEED_PCT_ENTITY = _PREFIX + "print_speed_adjustment"
 
     # FlashForge binary protocol constants
     _FF_PORT = 8899
