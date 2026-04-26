@@ -146,6 +146,7 @@ async def api_status():
         "total_layers": _safe(ha.get_total_layers),
         "current_file": _safe(ha.get_current_file),
         "speed_pct": _safe(ha.get_speed_pct),
+        "speed_mms": _safe(ha.get_print_speed_mms),
     }
 
 

@@ -32,6 +32,7 @@ async def poll_ha(
                 "total_layers": _safe(client.get_total_layers),
                 "current_file": _safe(client.get_current_file),
                 "speed_pct": _safe(client.get_speed_pct),
+                "speed_mms": _safe(client.get_print_speed_mms),
             }
             await broker.publish(event)
         except Exception as e:

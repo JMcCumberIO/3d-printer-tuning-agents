@@ -39,6 +39,9 @@ function updateStatus(d) {
   layerEl.textContent = (d.current_layer != null && d.total_layers != null)
     ? "Layer " + d.current_layer + " / " + d.total_layers : "";
 
+  document.getElementById("speed-mms").textContent =
+    d.speed_mms != null ? d.speed_mms.toFixed(0) + " mm/s" : "—";
+
   document.getElementById("print-status").style.color =
     d.print_status === "printing" ? "var(--accent2)" : "var(--text2)";
 }
