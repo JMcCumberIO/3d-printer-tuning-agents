@@ -65,10 +65,15 @@ def list_filaments():
 
 
 @cli.command(name="add-filament")
-@click.option("--filament", required=True, help="Filament name (e.g. 'ELEGOO PLA+ High Speed')")
-@click.option("--nozzle", required=True, default="0.4mm", help="Nozzle size (e.g. '0.4mm')")
+@click.option("--filament", default=None, help="Filament name (e.g. 'ELEGOO PLA+'); falls back to active_filament in config.yaml")
+@click.option("--nozzle", default=None, help="Nozzle size (e.g. '0.4mm'); falls back to active_nozzle in config.yaml")
 def add_filament(filament: str, nozzle: str):
     """Phase 0: Research a new filament and bootstrap from HA history."""
+    config = get_config()
+    filament = filament or config.get("active_filament", "")
+    nozzle = nozzle or config.get("active_nozzle", "0.4mm")
+    if not filament:
+        raise click.UsageError("--filament is required (or set active_filament in config.yaml)")
     orch = Orchestrator.from_config(
         db_path=DB_PATH,
         confirm_fn=lambda msg: click.confirm(msg),
