@@ -226,3 +226,59 @@ def test_get_speed_pct_returns_int():
     client = HAClient(urls=URLS, token=TOKEN)
     client.connect()
     assert client.get_speed_pct() == 110
+
+
+@respx.mock
+def test_get_speed_pct_scales_raw_10000_to_100():
+    """FlashForge reports 10000 to mean 100%; verify normalization."""
+    respx.get("https://primary.test:8123/api/").mock(
+        return_value=httpx.Response(200, json={"message": "API running."})
+    )
+    respx.get(
+        "https://primary.test:8123/api/states/sensor.flashforge_print_speed_adjustment"
+    ).mock(return_value=httpx.Response(200, json={"state": "10000"}))
+    client = HAClient(urls=URLS, token=TOKEN)
+    client.connect()
+    assert client.get_speed_pct() == 100
+
+
+@respx.mock
+def test_get_speed_pct_scales_boundary_1000():
+    """Value of exactly 1000 (= 10.00%) should be scaled, not passed through."""
+    respx.get("https://primary.test:8123/api/").mock(
+        return_value=httpx.Response(200, json={"message": "API running."})
+    )
+    respx.get(
+        "https://primary.test:8123/api/states/sensor.flashforge_print_speed_adjustment"
+    ).mock(return_value=httpx.Response(200, json={"state": "1000"}))
+    client = HAClient(urls=URLS, token=TOKEN)
+    client.connect()
+    assert client.get_speed_pct() == 10
+
+
+def _mock_api(urls=None):
+    respx.get("https://primary.test:8123/api/").mock(
+        return_value=httpx.Response(200, json={"message": "API running."})
+    )
+
+
+@respx.mock
+def test_is_printing_true_when_binary_sensor_on():
+    _mock_api()
+    respx.get(
+        "https://primary.test:8123/api/states/binary_sensor.flashforge_printing"
+    ).mock(return_value=httpx.Response(200, json={"state": "on"}))
+    client = HAClient(urls=URLS, token=TOKEN)
+    client.connect()
+    assert client.is_printing() is True
+
+
+@respx.mock
+def test_is_printing_false_when_binary_sensor_off():
+    _mock_api()
+    respx.get(
+        "https://primary.test:8123/api/states/binary_sensor.flashforge_printing"
+    ).mock(return_value=httpx.Response(200, json={"state": "off"}))
+    client = HAClient(urls=URLS, token=TOKEN)
+    client.connect()
+    assert client.is_printing() is False

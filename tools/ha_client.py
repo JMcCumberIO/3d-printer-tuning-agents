@@ -162,7 +162,11 @@ class HAClient:
 
     def get_speed_pct(self) -> Optional[int]:
         val = self._get_optional_state(self.SPEED_PCT_ENTITY)
-        return int(float(val)) if val is not None else None
+        if val is None:
+            return None
+        raw = int(float(val))
+        # FlashForge reports speed adjustment in 1/100ths of a percent (10000 = 100%)
+        return raw // 100 if raw >= 1000 else raw
 
     async def get_camera_snapshot_async(
         self, entity_id: str = CAMERA_ENTITY
