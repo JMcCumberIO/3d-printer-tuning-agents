@@ -10,7 +10,7 @@ class HAClient:
     _PREFIX = "sensor.flashforge_adventurer_5m_pro_flashforge_"
     NOZZLE_TEMP_ENTITY = _PREFIX + "right_nozzle_temperature"
     BED_TEMP_ENTITY = _PREFIX + "platform_temperature"
-    STATUS_ENTITY = _PREFIX + "status"
+    STATUS_ENTITY = "sensor.flashforge_status"  # kept old ID from entity registry
     PRINTING_ENTITY = "binary_sensor.flashforge_printing"
     PROGRESS_ENTITY = _PREFIX + "print_progress"
     SPEED_ENTITY = _PREFIX + "current_print_speed"
@@ -120,12 +120,10 @@ class HAClient:
     # --- Typed state accessors ---
 
     def get_nozzle_temp_c(self) -> float:
-        state = self.get_state(self.NOZZLE_TEMP_ENTITY)
-        return self.fahrenheit_to_celsius(float(state["state"]))
+        return float(self.get_state(self.NOZZLE_TEMP_ENTITY)["state"])
 
     def get_bed_temp_c(self) -> float:
-        state = self.get_state(self.BED_TEMP_ENTITY)
-        return self.fahrenheit_to_celsius(float(state["state"]))
+        return float(self.get_state(self.BED_TEMP_ENTITY)["state"])
 
     def get_print_status(self) -> str:
         return self.get_state(self.STATUS_ENTITY)["state"]
@@ -137,8 +135,7 @@ class HAClient:
         return self.get_state(self.PRINTING_ENTITY)["state"] == "on"
 
     def get_print_speed_mms(self) -> float:
-        state = self.get_state(self.SPEED_ENTITY)
-        return self.inches_per_sec_to_mms(float(state["state"]))
+        return float(self.get_state(self.SPEED_ENTITY)["state"])
 
     def _get_optional_state(self, entity_id: str) -> Optional[str]:
         """Return entity state string, or None if missing/unavailable/unknown."""

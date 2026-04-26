@@ -60,10 +60,10 @@ def test_get_state_returns_entity_dict():
 
 
 @respx.mock
-def test_get_nozzle_temp_converts_fahrenheit_to_celsius():
+def test_get_nozzle_temp_returns_celsius():
     _mock_api()
     respx.get(_api_url(HAClient.NOZZLE_TEMP_ENTITY)).mock(
-        return_value=httpx.Response(200, json={"state": "437.0"})  # 437°F = 225°C
+        return_value=httpx.Response(200, json={"state": "225.0"})  # HA reports °C directly
     )
     client = HAClient(urls=URLS, token=TOKEN)
     client.connect()
@@ -72,15 +72,15 @@ def test_get_nozzle_temp_converts_fahrenheit_to_celsius():
 
 
 @respx.mock
-def test_get_print_speed_converts_inches_to_mm():
+def test_get_print_speed_returns_mms():
     _mock_api()
     respx.get(_api_url(HAClient.SPEED_ENTITY)).mock(
-        return_value=httpx.Response(200, json={"state": "5.905511811"})  # 5.9 in/s ≈ 150 mm/s
+        return_value=httpx.Response(200, json={"state": "150.0"})  # HA reports mm/s directly
     )
     client = HAClient(urls=URLS, token=TOKEN)
     client.connect()
     speed = client.get_print_speed_mms()
-    assert abs(speed - 150.0) < 1.0
+    assert abs(speed - 150.0) < 0.1
 
 
 @respx.mock
