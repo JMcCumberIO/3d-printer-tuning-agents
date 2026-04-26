@@ -3,7 +3,7 @@ from pathlib import Path
 import yaml
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=False)  # shell env takes precedence over .env file
 
 _config_path = Path(__file__).parent.parent / "config.yaml"
 
