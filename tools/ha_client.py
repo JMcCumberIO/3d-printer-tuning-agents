@@ -147,16 +147,25 @@ class HAClient:
         except Exception:
             return None
 
+    def _printing_attr(self, key: str):
+        """Read an attribute from the printing binary sensor; return None if missing."""
+        try:
+            state = self.get_state(self.PRINTING_ENTITY)
+            val = state.get("attributes", {}).get(key)
+            return val if val not in (None, "", "unavailable", "unknown") else None
+        except Exception:
+            return None
+
     def get_current_layer(self) -> Optional[int]:
-        val = self._get_optional_state(self.LAYER_ENTITY)
-        return int(float(val)) if val is not None else None
+        val = self._printing_attr("print_layer")
+        return int(val) if val is not None else None
 
     def get_total_layers(self) -> Optional[int]:
-        val = self._get_optional_state(self.TOTAL_LAYERS_ENTITY)
-        return int(float(val)) if val is not None else None
+        val = self._printing_attr("target_print_layer")
+        return int(val) if val is not None else None
 
     def get_current_file(self) -> Optional[str]:
-        return self._get_optional_state(self.CURRENT_FILE_ENTITY)
+        return self._printing_attr("print_file_name")
 
     def get_speed_pct(self) -> Optional[int]:
         val = self._get_optional_state(self.SPEED_PCT_ENTITY)

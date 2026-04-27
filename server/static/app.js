@@ -42,6 +42,11 @@ function updateStatus(d) {
   document.getElementById("speed-mms").textContent =
     d.speed_mms != null ? d.speed_mms.toFixed(0) + " mm/s" : "—";
 
+  const fileEl = document.getElementById("current-file");
+  const fname = d.current_file ? d.current_file.replace(/\.gcode$/i, "") : "";
+  fileEl.textContent = fname;
+  fileEl.title = d.current_file || "";
+
   document.getElementById("print-status").style.color =
     d.print_status === "printing" ? "var(--accent2)" : "var(--text2)";
 }

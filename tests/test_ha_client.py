@@ -131,19 +131,10 @@ def test_unit_conversion_inches_per_sec_to_mm_per_sec():
 
 
 @respx.mock
-def test_get_current_layer_returns_none_when_entity_missing():
+def test_get_current_layer_returns_none_when_attribute_absent():
     _mock_api()
-    respx.get(_api_url(HAClient.LAYER_ENTITY)).mock(return_value=httpx.Response(404))
-    client = HAClient(urls=URLS, token=TOKEN)
-    client.connect()
-    assert client.get_current_layer() is None
-
-
-@respx.mock
-def test_get_current_layer_returns_none_for_unavailable_state():
-    _mock_api()
-    respx.get(_api_url(HAClient.LAYER_ENTITY)).mock(
-        return_value=httpx.Response(200, json={"state": "unavailable"})
+    respx.get(_api_url(HAClient.PRINTING_ENTITY)).mock(
+        return_value=httpx.Response(200, json={"state": "off", "attributes": {}})
     )
     client = HAClient(urls=URLS, token=TOKEN)
     client.connect()
@@ -151,10 +142,21 @@ def test_get_current_layer_returns_none_for_unavailable_state():
 
 
 @respx.mock
-def test_get_current_layer_returns_int_when_sensor_available():
+def test_get_current_layer_returns_none_when_printing_entity_missing():
     _mock_api()
-    respx.get(_api_url(HAClient.LAYER_ENTITY)).mock(
-        return_value=httpx.Response(200, json={"state": "42"})
+    respx.get(_api_url(HAClient.PRINTING_ENTITY)).mock(return_value=httpx.Response(404))
+    client = HAClient(urls=URLS, token=TOKEN)
+    client.connect()
+    assert client.get_current_layer() is None
+
+
+@respx.mock
+def test_get_current_layer_returns_int_from_printing_attribute():
+    _mock_api()
+    respx.get(_api_url(HAClient.PRINTING_ENTITY)).mock(
+        return_value=httpx.Response(200, json={
+            "state": "on", "attributes": {"print_layer": 42, "target_print_layer": 300}
+        })
     )
     client = HAClient(urls=URLS, token=TOKEN)
     client.connect()
@@ -174,10 +176,12 @@ async def test_get_camera_snapshot_async_returns_bytes():
 
 
 @respx.mock
-def test_get_total_layers_returns_int_when_sensor_available():
+def test_get_total_layers_returns_int_from_printing_attribute():
     _mock_api()
-    respx.get(_api_url(HAClient.TOTAL_LAYERS_ENTITY)).mock(
-        return_value=httpx.Response(200, json={"state": "120"})
+    respx.get(_api_url(HAClient.PRINTING_ENTITY)).mock(
+        return_value=httpx.Response(200, json={
+            "state": "on", "attributes": {"print_layer": 42, "target_print_layer": 120}
+        })
     )
     client = HAClient(urls=URLS, token=TOKEN)
     client.connect()
@@ -185,10 +189,12 @@ def test_get_total_layers_returns_int_when_sensor_available():
 
 
 @respx.mock
-def test_get_current_file_returns_string():
+def test_get_current_file_returns_string_from_printing_attribute():
     _mock_api()
-    respx.get(_api_url(HAClient.CURRENT_FILE_ENTITY)).mock(
-        return_value=httpx.Response(200, json={"state": "benchy.gcode"})
+    respx.get(_api_url(HAClient.PRINTING_ENTITY)).mock(
+        return_value=httpx.Response(200, json={
+            "state": "on", "attributes": {"print_file_name": "benchy.gcode"}
+        })
     )
     client = HAClient(urls=URLS, token=TOKEN)
     client.connect()
